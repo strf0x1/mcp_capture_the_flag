@@ -88,6 +88,43 @@ def test_list_files_tool(agent: Agent, test_directory: str = None) -> None:
         print(f"❌ Error testing list_files tool: {e}")
 
 
+def test_explain_file_tool(agent: Agent, test_directory: str = None) -> None:
+    """
+    Test the explain_file tool functionality.
+    
+    Args:
+        agent: The Strands agent instance
+        test_directory: Optional directory path to inspect (defaults to home directory)
+    """
+    if test_directory is None:
+        test_directory = str(Path.home())
+    
+    print(f"\n🧪 Testing explain_file tool with directory: {test_directory}")
+    print("=" * 60)
+    
+    test_prompt = f"""
+    Please use the explain_file tool to inspect the directory: {test_directory}
+    
+    Then, use list_files to see what's inside, and use explain_file on 2-3 different 
+    items you find (mix of files and directories if possible).
+    
+    For each item you inspect, please tell me:
+    1. What type it is (file, directory, symlink)
+    2. Its size
+    3. Whether it appears to be text or binary (for files)
+    4. Any other interesting metadata you discover
+    
+    This demonstrates how you can safely inspect files before attempting to read them!
+    """
+    
+    try:
+        response = agent(test_prompt)
+        print(f"\n🤖 Agent Response:")
+        print(response)
+    except Exception as e:
+        print(f"❌ Error testing explain_file tool: {e}")
+
+
 def demonstrate_ctf_exploration(agent: Agent) -> None:
     """
     Demonstrate CTF-style exploration using the agent.
@@ -100,11 +137,16 @@ def demonstrate_ctf_exploration(agent: Agent) -> None:
     I'm playing a Capture the Flag (CTF) game where I need to find a hidden flag.
     
     Please help me explore the filesystem starting from my home directory.
-    Use the list_files tool to:
-    1. First, list the contents of my home directory
+    Use your tools strategically:
+    1. First, use list_files to see what's in my home directory
     2. Look for any interesting directories that might contain a CTF setup
-    3. If you find directories with names like 'ctf', 'ctf_root', 'puzzles', or similar, explore those
-    4. Pay attention to any files with extensions like .txt, .b64, or other suspicious files
+    3. Use explain_file to inspect promising files/directories before exploring further
+    4. If you find directories with names like 'ctf', 'ctf_root', 'puzzles', or similar, explore those
+    5. Pay attention to any files with extensions like .txt, .b64, or other suspicious files
+    6. Use explain_file to check if files are text or binary before attempting to read them
+    
+    Remember: explain_file is crucial for avoiding binary file overflow! 
+    Always inspect files before reading them.
     
     Start your exploration and tell me what you discover!
     """
@@ -175,16 +217,25 @@ def main():
                 Your goal is to help explore the filesystem to find hidden flags.
                 Use the available tools strategically and methodically.
                 
-                When using the list_files tool:
-                - Always provide the full path as a string
+                Available tools:
+                - list_files: List contents of directories
+                - explain_file: Get metadata about files/directories (type, size, text vs binary)
+                
+                Best practices:
+                - Always provide full paths as strings
+                - Use explain_file to inspect files before reading them (prevents binary overflow)
                 - Be systematic in your exploration
                 - Pay attention to interesting filenames and directory structures
+                - Use explain_file to identify text files vs binary files
                 - Report back clearly on what you find
                 """
             )
             
             # Test the list_files tool with a simple directory
             test_list_files_tool(agent)
+            
+            # Test the explain_file tool
+            test_explain_file_tool(agent)
             
             # Demonstrate CTF exploration capabilities
             demonstrate_ctf_exploration(agent)
