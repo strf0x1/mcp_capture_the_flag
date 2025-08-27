@@ -253,3 +253,103 @@ def explain_file(path: str) -> Dict[str, Any]:
         PermissionError: If access to file/directory is denied
     """
     return _explain_file_impl(path)
+
+
+def _get_file_impl(path: str, max_chars: int = 50000) -> str:
+    """
+    Takes a full path to a real file as a string and returns its entire content.
+    Do not use this on directories. Use this to read a file's contents.
+    
+    This tool is scoped to only work within your home directory for security.
+    Only works on text files to prevent binary data corruption.
+    
+    Args:
+        path: File path to read contents from
+        max_chars: Maximum number of characters to return (default: 50,000)
+        
+    Returns:
+        String containing the file contents, potentially truncated if too long.
+        If truncated, includes a message about truncation at the end.
+        
+    Raises:
+        ValueError: If path is outside home directory, doesn't exist, is not a file,
+                   or appears to be a binary file
+        PermissionError: If access to file is denied
+    """
+    try:
+        # Convert to Path object for easier manipulation
+        target_path = Path(path).resolve()
+        
+        # Security check: ensure path is within home directory
+        if not str(target_path).startswith(str(HOME_DIR)):
+            raise ValueError(f"Path must be within home directory ({HOME_DIR})")
+        
+        # Check if path exists and is a file
+        if not target_path.exists():
+            raise ValueError(f"Path does not exist: {target_path}")
+            
+        if not target_path.is_file():
+            raise ValueError(f"Path is not a file (use list_files for directories): {target_path}")
+        
+        # Use explain_file to check if it's a text file
+        file_info = _explain_file_impl(path)
+        
+        # Only allow reading text files
+        if file_info.get('is_binary', True):  # Default to True for safety
+            raise ValueError(f"File appears to be binary and cannot be safely read as text: {target_path}")
+        
+        # Read file content
+        try:
+            with open(target_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except UnicodeDecodeError:
+            # If UTF-8 fails, try with error handling
+            try:
+                with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+            except Exception:
+                raise ValueError(f"File cannot be read as text (encoding issues): {target_path}")
+        
+        # Check if truncation is needed
+        original_length = len(content)
+        if original_length > max_chars:
+            content = content[:max_chars]
+            truncation_msg = f"\n\n[TRUNCATED: File was {original_length:,} characters, showing first {max_chars:,} characters. {original_length - max_chars:,} characters were truncated.]"
+            content += truncation_msg
+        
+        return content
+        
+    except PermissionError as e:
+        raise PermissionError(f"Permission denied accessing: {path}")
+    except Exception as e:
+        if isinstance(e, ValueError):
+            raise  # Re-raise ValueError as-is
+        raise ValueError(f"Error reading file {path}: {str(e)}")
+
+
+# Expose the raw function for testing
+get_file_raw = _get_file_impl
+
+# Register the tool with MCP
+@mcp.tool
+def get_file(path: str) -> str:
+    """
+    Takes a full path to a real file as a string and returns its entire content.
+    Do not use this on directories. Use this to read a file's contents.
+    
+    This tool is scoped to only work within your home directory for security.
+    Only works on text files to prevent binary data corruption.
+    
+    Args:
+        path: File path to read contents from
+        
+    Returns:
+        String containing the file contents, potentially truncated if too long.
+        If truncated, includes a message about truncation at the end.
+        
+    Raises:
+        ValueError: If path is outside home directory, doesn't exist, is not a file,
+                   or appears to be a binary file
+        PermissionError: If access to file is denied
+    """
+    return _get_file_impl(path)

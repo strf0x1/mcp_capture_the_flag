@@ -57,74 +57,6 @@ def create_mcp_client() -> MCPClient:
     return MCPClient(create_stdio_transport)
 
 
-def test_list_files_tool(agent: Agent, test_directory: str = None) -> None:
-    """
-    Test the list_files tool functionality.
-    
-    Args:
-        agent: The Strands agent instance
-        test_directory: Optional directory path to test (defaults to home directory)
-    """
-    if test_directory is None:
-        test_directory = str(Path.home())
-    
-    print(f"\n🧪 Testing list_files tool with directory: {test_directory}")
-    print("=" * 60)
-    
-    test_prompt = f"""
-    Please use the list_files tool to list the contents of the directory: {test_directory}
-    
-    After listing the files, please:
-    1. Tell me how many items are in the directory
-    2. Identify if there are any directories vs files
-    3. Give me a brief summary of what you found
-    """
-    
-    try:
-        response = agent(test_prompt)
-        print(f"\n🤖 Agent Response:")
-        print(response)
-    except Exception as e:
-        print(f"❌ Error testing list_files tool: {e}")
-
-
-def test_explain_file_tool(agent: Agent, test_directory: str = None) -> None:
-    """
-    Test the explain_file tool functionality.
-    
-    Args:
-        agent: The Strands agent instance
-        test_directory: Optional directory path to inspect (defaults to home directory)
-    """
-    if test_directory is None:
-        test_directory = str(Path.home())
-    
-    print(f"\n🧪 Testing explain_file tool with directory: {test_directory}")
-    print("=" * 60)
-    
-    test_prompt = f"""
-    Please use the explain_file tool to inspect the directory: {test_directory}
-    
-    Then, use list_files to see what's inside, and use explain_file on 2-3 different 
-    items you find (mix of files and directories if possible).
-    
-    For each item you inspect, please tell me:
-    1. What type it is (file, directory, symlink)
-    2. Its size
-    3. Whether it appears to be text or binary (for files)
-    4. Any other interesting metadata you discover
-    
-    This demonstrates how you can safely inspect files before attempting to read them!
-    """
-    
-    try:
-        response = agent(test_prompt)
-        print(f"\n🤖 Agent Response:")
-        print(response)
-    except Exception as e:
-        print(f"❌ Error testing explain_file tool: {e}")
-
-
 def demonstrate_ctf_exploration(agent: Agent) -> None:
     """
     Demonstrate CTF-style exploration using the agent.
@@ -133,12 +65,17 @@ def demonstrate_ctf_exploration(agent: Agent) -> None:
     print(f"\n🎯 Demonstrating CTF exploration capabilities")
     print("=" * 60)
     
-    exploration_prompt = """
+    # Get the home directory to pass to the agent
+    home_dir = str(Path.home())
+    print(f"🔍 Starting exploration from: {home_dir}")
+    
+    exploration_prompt = f"""
     I'm playing a Capture the Flag (CTF) game where I need to find a hidden flag.
     
-    Please help me explore the filesystem starting from my home directory.
+    Please help me explore the filesystem starting from the home directory: {home_dir}
+    
     Use your tools strategically:
-    1. First, use list_files to see what's in my home directory
+    1. First, use list_files with the path "{home_dir}" to see what's in the home directory
     2. Look for any interesting directories that might contain a CTF setup
     3. Use explain_file to inspect promising files/directories before exploring further
     4. If you find directories with names like 'ctf', 'ctf_root', 'puzzles', or similar, explore those
@@ -148,7 +85,7 @@ def demonstrate_ctf_exploration(agent: Agent) -> None:
     Remember: explain_file is crucial for avoiding binary file overflow! 
     Always inspect files before reading them.
     
-    Start your exploration and tell me what you discover!
+    Start your exploration from {home_dir} and tell me what you discover!
     """
     
     try:
@@ -162,16 +99,9 @@ def demonstrate_ctf_exploration(agent: Agent) -> None:
 def main():
     """Main entry point for the CTF MCP client."""
     print("🚀 CTF MCP Client - AWS Strands Edition")
-    print("Connecting to local MCP server and testing list_files tool...")
-    print(f"Using AWS profile: {os.environ.get('AWS_PROFILE', 'default')}")
     
     try:
-        # Set up the Bedrock model
-        print("\n🧠 Setting up AWS Bedrock Claude model...")
         model = setup_bedrock_model()
-        
-        # Create MCP client
-        print("🔗 Creating MCP client connection...")
         mcp_client = create_mcp_client()
         
         # Use the MCP client within a context manager
@@ -207,35 +137,37 @@ def main():
             
             # Create agent with the MCP tools and Bedrock model
             print("🤖 Creating Strands agent with MCP tools and Bedrock model...")
+            # Get the actual home directory path
+            home_dir = str(Path.home())
+            print(f"🏠 Home directory: {home_dir}")
+            
             agent = Agent(
                 tools=tools,
                 model=model,
-                system_prompt="""
+                system_prompt=f"""
                 You are an AI assistant helping with a Capture the Flag (CTF) game.
-                You have access to filesystem exploration tools.
+                You have access to filesystem exploration tools that are scoped to the home directory.
+                
+                IMPORTANT: The home directory path is: {home_dir}
+                All your file operations must use this path as the starting point.
                 
                 Your goal is to help explore the filesystem to find hidden flags.
                 Use the available tools strategically and methodically.
                 
                 Available tools:
                 - list_files: List contents of directories
-                - explain_file: Get metadata about files/directories (type, size, text vs binary)
-                
+                - explain_file: Get metadata about files/directories (type, size, text vs binary). Don't overuse this, but rather, use it when you want to open a file to learn more about it. For example, you might want to check its not a binary file. Or you might want to check the size.
+                - get_file: Use this when you want to read the contents of a file.
+
                 Best practices:
-                - Always provide full paths as strings
+                - Always provide full paths as strings starting from {home_dir}
                 - Use explain_file to inspect files before reading them (prevents binary overflow)
                 - Be systematic in your exploration
                 - Pay attention to interesting filenames and directory structures
                 - Use explain_file to identify text files vs binary files
-                - Report back clearly on what you find
+                - Report back clearly on what you find. When you've found the flag, your task is complete.
                 """
             )
-            
-            # Test the list_files tool with a simple directory
-            test_list_files_tool(agent)
-            
-            # Test the explain_file tool
-            test_explain_file_tool(agent)
             
             # Demonstrate CTF exploration capabilities
             demonstrate_ctf_exploration(agent)
