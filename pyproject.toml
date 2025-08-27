@@ -1,0 +1,28 @@
+[project]
+name = "mcp-capture-the-flag"
+version = "0.1.0"
+description = "Interactive Capture the Flag game built with Model Context Protocol to demonstrate Digital Affordance Discovery pattern"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.11.0",
+    "strands-agents>=1.0.0",
+    "boto3>=1.35.0",
+    "pytest>=8.4.1",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+ctf-server = "server.main:main"
+ctf-client = "client.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+pythonpath = ["."]
